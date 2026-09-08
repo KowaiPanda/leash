@@ -1,0 +1,15 @@
+{
+  "name": "leash",
+  "version": "1.0.0",
+  "description": "Leash lets a human issue an agent a **Mandate**: a signed, revocable, on-chain-logged\r budget grant (scope + ceiling + rate limit + expiry). Every x402 payment an agent\r makes is checked against its mandate's *remaining allowance* **before** settlement —\r so the cap is enforced by the payment rail, not by the agent's own good behaviour.",
+  "main": "index.js",
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
