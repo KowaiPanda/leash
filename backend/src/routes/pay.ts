@@ -5,6 +5,7 @@ import { mandateGuard } from "../middleware/mandateGuard.js";
 import { recordDecrement, appendEvent } from "../services/mandateService.js";
 import { submitMandateEvent } from "../services/hcsService.js";
 import { verifyPayment, settlePayment, buildPaymentRequirements } from "../services/facilitatorClient.js";
+import { buildHederaExactPayload } from "../services/hederaPaymentClient.js";
 
 export const payRouter = Router();
 
@@ -39,10 +40,21 @@ payRouter.post("/", mandateGuard(RESOURCE_PATH), async (req, res) => {
     let mocked = false;
 
     const paymentRequirements = buildPaymentRequirements(RESOURCE_PATH, amount);
-    const paymentPayload = req.body?.paymentPayload ?? {
+    const amountSmallestUnit = Number(paymentRequirements.amount);
+
+    const transactionB64 = await buildHederaExactPayload({
+      agentAccountId: process.env.AGENT_HEDERA_ACCOUNT_ID!,
+      agentPrivateKeyDer: process.env.AGENT_HEDERA_PRIVATE_KEY!,
+      payToAccountId: paymentRequirements.payTo,
+      feePayerAccountId: paymentRequirements.extra.feePayer,
+      tokenId: paymentRequirements.asset,
+      amountSmallestUnit,
+    });
+
+    const paymentPayload = {
       x402Version: 2,
       accepted: paymentRequirements,
-      payload: {},                       // real signature/authorization goes here once a real client signs it
+      payload: { transaction: transactionB64 },
       resource: { url: RESOURCE_PATH },
     };
 

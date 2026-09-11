@@ -23,7 +23,7 @@ export async function verifyPayment(body: VerifyRequest) {
 }
 
 export async function settlePayment(body: VerifyRequest) {
-  const res = await fetch(`${config.blocky402.baseUrl}/v2/x402/settle`, {
+  const res = await fetch(`${config.blocky402.baseUrl}/settle`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -44,8 +44,6 @@ export function buildPaymentRequirements(resourcePath: string, priceUsdc: number
     amount: Math.round(priceUsdc * 1_000_000).toString(),
     payTo: process.env.RESOURCE_PAYEE_ADDRESS ?? "0.0.0000",
     maxTimeoutSeconds: 60,
-    extra: {
-      feePayer: "0.0.7162784"
-    },
+    extra: { feePayer: process.env.BLOCKY402_FEE_PAYER ?? "0.0.7162784" },
   };
 }
