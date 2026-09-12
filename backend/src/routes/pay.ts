@@ -6,6 +6,7 @@ import { recordDecrement, appendEvent } from "../services/mandateService.js";
 import { submitMandateEvent } from "../services/hcsService.js";
 import { verifyPayment, settlePayment, buildPaymentRequirements } from "../services/facilitatorClient.js";
 import { buildHederaExactPayload } from "../services/hederaPaymentClient.js";
+import { settleOnArc, isArcLive } from "../services/arcAgentService.js";
 
 export const payRouter = Router();
 
@@ -26,6 +27,7 @@ const RESOURCE_PATH = "/api/premium-data";
 payRouter.get("/rails", (_req, res) => {
   res.json({
     hedera: { rail: "hedera", live: true, network: config.blocky402.network },
+    arc: { rail: "arc", live: isArcLive(), network: "ARC-TESTNET" },
   });
 });
 
@@ -39,32 +41,40 @@ payRouter.post("/", mandateGuard(RESOURCE_PATH), async (req, res) => {
     let network: string;
     let mocked = false;
 
-    const paymentRequirements = buildPaymentRequirements(RESOURCE_PATH, amount);
-    const amountSmallestUnit = Number(paymentRequirements.amount);
+    if(rail === "arc") {
+      const settlement = await settleOnArc(amount);
+      txHash = settlement.txHash;
+      network = settlement.network;
+      mocked = settlement.mocked;
+    } 
+    else {
+      const paymentRequirements = buildPaymentRequirements(RESOURCE_PATH, amount);
+      const amountSmallestUnit = Number(paymentRequirements.amount);
 
-    const transactionB64 = await buildHederaExactPayload({
-      agentAccountId: process.env.AGENT_HEDERA_ACCOUNT_ID!,
-      agentPrivateKeyDer: process.env.AGENT_HEDERA_PRIVATE_KEY!,
-      payToAccountId: paymentRequirements.payTo,
-      feePayerAccountId: paymentRequirements.extra.feePayer,
-      tokenId: paymentRequirements.asset,
-      amountSmallestUnit,
-    });
+      const transactionB64 = await buildHederaExactPayload({
+        agentAccountId: process.env.AGENT_HEDERA_ACCOUNT_ID!,
+        agentPrivateKeyDer: process.env.AGENT_HEDERA_PRIVATE_KEY!,
+        payToAccountId: paymentRequirements.payTo,
+        feePayerAccountId: paymentRequirements.extra.feePayer,
+        tokenId: paymentRequirements.asset,
+        amountSmallestUnit,
+      });
 
-    const paymentPayload = {
-      x402Version: 2,
-      accepted: paymentRequirements,
-      payload: { transaction: transactionB64 },
-      resource: { url: RESOURCE_PATH },
-    };
+      const paymentPayload = {
+        x402Version: 2,
+        accepted: paymentRequirements,
+        payload: { transaction: transactionB64 },
+        resource: { url: RESOURCE_PATH },
+      };
 
-    const verified = await verifyPayment({ paymentPayload, paymentRequirements });
-    if (!verified.isValid) {
-    return res.status(402).json({ error: "facilitator rejected payment", reason: verified.invalidReason });
+      const verified = await verifyPayment({ paymentPayload, paymentRequirements });
+      if (!verified.isValid) {
+      return res.status(402).json({ error: "facilitator rejected payment", reason: verified.invalidReason });
+      }
+      const settled = await settlePayment({ paymentPayload, paymentRequirements });
+      txHash = settled.transaction ?? "unknown";
+      network = config.blocky402.network;
     }
-    const settled = await settlePayment({ paymentPayload, paymentRequirements });
-    txHash = settled.transaction ?? "unknown";
-    network = config.blocky402.network;
 
     recordDecrement(mandateId, amount);
     const { seq, consensusTimestamp } = await submitMandateEvent({
