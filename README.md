@@ -86,8 +86,6 @@ Hedera.
 
 ## Live and verifiable
 
-*(Fill in with real values from a live run — do not ship placeholders in your final submission.)*
-
 | | |
 |---|---|
 | Live app | `https://leash-kowaipanda.vercel.app/` |
