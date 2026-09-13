@@ -7,28 +7,30 @@ const tabs = [
   { to: "/audit", label: "Audit Trail" },
 ];
 
-export function Nav() {
-  let auth: { authenticated: boolean; login: () => void; logout: () => void; user?: any } | null = null;
+type OptionalAuth = { authenticated: boolean; login: () => void; logout: () => void; user?: any } | null;
+
+function useOptionalPrivy(): OptionalAuth {
   try {
-    auth = usePrivy();
+    return usePrivy();
   } catch {
-    // PrivyProvider not mounted
+    // PrivyProvider not mounted (no VITE_PRIVY_APP_ID yet) — nav still renders.
+    return null;
   }
+}
+
+export function Nav() {
+  const auth = useOptionalPrivy();
 
   return (
-    <nav className="mx-auto mt-4 flex w-[95%] max-w-6xl items-center justify-between rounded-3xl border border-gray-700 px-6 py-4 bg-slate-500/50 backdrop-blur-md">
+    <nav className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
       <div className="flex items-center gap-6">
-        <img 
-          src="/logo.png" 
-          alt="Leash Logo" 
-          className="h-12 w-auto object-contain" 
-        />
+        <span className="text-lg font-semibold tracking-tight text-cyan-400">Leash</span>
         {tabs.map((t) => (
           <NavLink
             key={t.to}
             to={t.to}
             className={({ isActive }) =>
-              `text-sm ${isActive ? "text-white font-medium" : "text-slate-200 hover:text-slate-100"}`
+              `text-sm ${isActive ? "text-white font-medium" : "text-slate-400 hover:text-slate-200"}`
             }
           >
             {t.label}

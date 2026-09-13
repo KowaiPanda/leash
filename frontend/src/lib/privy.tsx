@@ -14,7 +14,9 @@ export function LeashPrivyProvider({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        embeddedWallets: { createOnLogin: "users-without-wallets" },
+        embeddedWallets: {
+          ethereum: { createOnLogin: "users-without-wallets" },
+        },
         appearance: { theme: "dark", accentColor: "#22d3ee" },
       }}
     >
