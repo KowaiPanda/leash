@@ -22,9 +22,13 @@ export function Nav() {
   const auth = useOptionalPrivy();
 
   return (
-    <nav className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+    <nav className="mx-auto mt-4 flex w-[95%] max-w-6xl items-center justify-between rounded-3xl border border-gray-700 px-6 py-4 bg-slate-500/50 backdrop-blur-md">
       <div className="flex items-center gap-6">
-        <span className="text-lg font-semibold tracking-tight text-cyan-400">Leash</span>
+        <img 
+          src="/logo.jpg" 
+          alt="Leash Logo" 
+          className="h-8 w-auto object-contain" 
+        />
         {tabs.map((t) => (
           <NavLink
             key={t.to}

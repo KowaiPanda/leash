@@ -11,7 +11,7 @@ Built for ETHOnline 2026 on three sponsors — **Hedera**, **Privy**, and
 **Arc / Circle** — enforcing one mandate across two independent settlement
 rails.
 
-Live Now: `[add your deployed URL here]` · Hedera Testnet + Arc Testnet · Self-issued mandates · Dual-rail settlement
+Live Now: `https://leash-kowaipanda.vercel.app/` · Hedera Testnet + Arc Testnet · Self-issued mandates · Dual-rail settlement
 
 ---
 
@@ -90,7 +90,7 @@ Hedera.
 
 | | |
 |---|---|
-| Live app | `[deployed URL]` |
+| Live app | `https://leash-kowaipanda.vercel.app/` |
 | Hedera HCS audit topic | `0.0.10473152` |
 | Hedera mirror node feed | `https://testnet.mirrornode.hedera.com/api/v1/topics/0.0.10473152/messages` |
 | Example mandate (Hedera rail) | `d49752e0-dda4-41b2-abfa-a984377ff478` — issuance HCS seq `#29` |
