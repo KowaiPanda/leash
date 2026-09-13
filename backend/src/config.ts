@@ -11,7 +11,10 @@ function required(name: string, fallback?: string): string {
 
 export const config = {
   port: Number(process.env.PORT ?? 4000),
-  frontendOrigin: process.env.FRONTEND_ORIGIN ?? "http://localhost:5173",
+  frontendOrigins: (process.env.FRONTEND_ORIGIN ?? "http://localhost:5173")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
 
   hedera: {
     operatorId: required("HEDERA_OPERATOR_ID"),
