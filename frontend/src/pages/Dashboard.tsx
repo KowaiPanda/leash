@@ -1,11 +1,27 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePrivy } from "@privy-io/react-auth";
 import { api } from "../lib/api";
 import { MandateCard } from "../components/MandateCard";
+
+type LogLine = {
+  id: string;
+  ok: boolean;
+  action: string;
+  message: string;
+  at: string;
+};
 
 export function Dashboard() {
   const qc = useQueryClient();
   const mandatesQuery = useQuery({ queryKey: ["mandates"], queryFn: api.listMandates, refetchInterval: 4000 });
+
+  let privyUser: { id: string } | null | undefined;
+  try {
+    ({ user: privyUser } = usePrivy());
+  } catch {
+    // PrivyProvider not mounted yet (VITE_PRIVY_APP_ID unset) — fall back below.
+  }
 
   const [form, setForm] = useState({
     agentId: "agent-research-bot",
@@ -16,27 +32,52 @@ export function Dashboard() {
     expiresInHours: "24",
   });
 
+  const [log, setLog] = useState<LogLine[]>([]);
+  const pushLog = (ok: boolean, action: string, message: string) =>
+    setLog((l) => [{ id: crypto.randomUUID(), ok, action, message, at: new Date().toISOString() }, ...l].slice(0, 50));
+
   const createMutation = useMutation({
     mutationFn: () =>
       api.createMandate({
         agentId: form.agentId,
-        issuerUserId: "demo-issuer", // replace with the logged-in Privy user id once auth is wired up
+        issuerUserId: privyUser?.id ?? "demo-issuer",
         scope: form.scope.split(",").map((s) => s.trim()),
         ceiling: Number(form.ceiling),
         rateLimit: { maxAmount: Number(form.rateMax), windowSeconds: Number(form.rateWindow) },
         expiresAt: new Date(Date.now() + Number(form.expiresInHours) * 3600_000).toISOString(),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["mandates"] }),
+    onSuccess: (mandate) => {
+      qc.invalidateQueries({ queryKey: ["mandates"] });
+      pushLog(true, "Issue mandate", `${mandate.agentId} — ceiling $${mandate.ceiling.toFixed(2)}, HCS seq #${mandate.hcsIssuanceSeq ?? "pending"}`);
+    },
+    onError: (e: Error) => pushLog(false, "Issue mandate", e.message),
   });
 
   const revokeMutation = useMutation({
     mutationFn: (id: string) => api.revokeMandate(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["mandates"] }),
+    onSuccess: (mandate) => {
+      qc.invalidateQueries({ queryKey: ["mandates"] });
+      pushLog(true, "Revoke", `${mandate.agentId} revoked`);
+    },
+    onError: (e: Error) => pushLog(false, "Revoke", e.message),
   });
 
   const raiseMutation = useMutation({
     mutationFn: ({ id, newCeiling }: { id: string; newCeiling: number }) => api.raiseCeiling(id, newCeiling),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["mandates"] }),
+    onSuccess: (mandate) => {
+      qc.invalidateQueries({ queryKey: ["mandates"] });
+      pushLog(true, "Raise ceiling", `${mandate.agentId} → $${mandate.ceiling.toFixed(2)}`);
+    },
+    onError: (e: Error) => pushLog(false, "Raise ceiling", e.message),
+  });
+
+  const checkCeilingMutation = useMutation({
+    mutationFn: (id: string) => api.checkCeilingRaise(id),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["mandates"] });
+      pushLog(true, "Check ceiling raise", `status: ${result.intentStatus}`);
+    },
+    onError: (e: Error) => pushLog(false, "Check ceiling raise", e.message),
   });
 
   return (
@@ -83,9 +124,6 @@ export function Dashboard() {
           >
             {createMutation.isPending ? "Issuing..." : "Issue mandate"}
           </button>
-          {createMutation.isError && (
-            <p className="text-xs text-red-400">{(createMutation.error as Error).message}</p>
-          )}
         </form>
 
         <div className="space-y-4 lg:col-span-2">
@@ -97,11 +135,41 @@ export function Dashboard() {
               key={m.id}
               mandate={m}
               onRevoke={(id) => revokeMutation.mutate(id)}
+              onCheckCeilingRaise={(id) => checkCeilingMutation.mutate(id)}
               onRaiseCeiling={(id, current) => {
                 const next = prompt("New ceiling (USDC)?", (current + 1).toFixed(2));
                 if (next) raiseMutation.mutate({ id, newCeiling: Number(next) });
               }}
             />
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-800 bg-slate-900 p-4">
+        <h2 className="mb-2 font-medium">Activity log</h2>
+        <p className="mb-3 text-xs text-slate-500">
+          Every action you take here — issue, revoke, raise ceiling — shows up immediately below,
+          so the outcome is visible without waiting on the card to visually update.
+        </p>
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {log.length === 0 && <p className="text-sm text-slate-500">Nothing yet.</p>}
+          {log.map((l) => (
+            <div
+              key={l.id}
+              className={`rounded border p-2 text-xs ${
+                l.ok
+                  ? "border-emerald-900 bg-emerald-950/40 text-emerald-300"
+                  : "border-red-900 bg-red-950/40 text-red-300"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-medium">
+                  {l.ok ? "✓" : "✗"} {l.action}
+                </span>
+                <span className="opacity-60">{new Date(l.at).toLocaleTimeString()}</span>
+              </div>
+              <p className="mt-0.5 opacity-90">{l.message}</p>
+            </div>
           ))}
         </div>
       </div>

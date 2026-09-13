@@ -64,6 +64,15 @@ export function listEvents(mandateId: string): MandateEvent[] {
   return events.get(mandateId) ?? [];
 }
 
+export function listAllEventsEnriched(): (MandateEvent & { agentId: string })[] {
+  const all: (MandateEvent & { agentId: string })[] = [];
+  for (const [mandateId, list] of events.entries()) {
+    const agentId = mandates.get(mandateId)?.agentId ?? "unknown";
+    for (const e of list) all.push({ ...e, agentId });
+  }
+  return all.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
 export function appendEvent(evt: Omit<MandateEvent, "id" | "createdAt">): MandateEvent {
   const full: MandateEvent = { ...evt, id: uuid(), createdAt: new Date().toISOString() };
   const list = events.get(evt.mandateId) ?? [];

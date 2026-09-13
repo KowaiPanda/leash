@@ -4,10 +4,12 @@ export function MandateCard({
   mandate,
   onRevoke,
   onRaiseCeiling,
+  onCheckCeilingRaise,
 }: {
   mandate: Mandate;
   onRevoke?: (id: string) => void;
   onRaiseCeiling?: (id: string, current: number) => void;
+  onCheckCeilingRaise?: (id: string) => void;
 }) {
   const pct = Math.min(100, (mandate.spent / mandate.ceiling) * 100);
   const expired = new Date(mandate.expiresAt).getTime() < Date.now();
@@ -59,6 +61,21 @@ export function MandateCard({
         </p>
         {mandate.hcsIssuanceSeq !== null && (
           <p className="mt-1 text-xs text-slate-600">HCS issuance seq #{mandate.hcsIssuanceSeq}</p>
+        )}
+        {mandate.pendingCeilingRaise && (
+          <div className="mt-2 flex items-center justify-between rounded bg-yellow-950 px-2 py-1">
+            <span className="text-xs text-yellow-400">
+              raise to ${mandate.pendingCeilingRaise.newCeiling.toFixed(2)} pending quorum approval
+            </span>
+            {onCheckCeilingRaise && (
+              <button
+                onClick={() => onCheckCeilingRaise(mandate.id)}
+                className="ml-2 rounded bg-yellow-900 px-2 py-0.5 text-xs text-yellow-200 hover:bg-yellow-800"
+              >
+                Check
+              </button>
+            )}
+          </div>
         )}
       </div>
 

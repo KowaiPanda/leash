@@ -16,22 +16,26 @@ export function Nav() {
   }
 
   return (
-    <nav className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+    <nav className="mx-auto mt-4 flex w-[95%] max-w-6xl items-center justify-between rounded-3xl border border-gray-700 px-6 py-4 bg-slate-500/50 backdrop-blur-md">
       <div className="flex items-center gap-6">
-        <span className="text-lg font-semibold tracking-tight text-cyan-400">Leash</span>
+        <img 
+          src="/logo.png" 
+          alt="Leash Logo" 
+          className="h-12 w-auto object-contain" 
+        />
         {tabs.map((t) => (
           <NavLink
             key={t.to}
             to={t.to}
             className={({ isActive }) =>
-              `text-sm ${isActive ? "text-white font-medium" : "text-slate-400 hover:text-slate-200"}`
+              `text-sm ${isActive ? "text-white font-medium" : "text-slate-200 hover:text-slate-100"}`
             }
           >
             {t.label}
           </NavLink>
         ))}
       </div>
-      <div>
+      {/* <div>
         {auth?.authenticated ? (
           <button onClick={auth.logout} className="text-sm text-slate-400 hover:text-slate-200">
             Log out
@@ -44,7 +48,7 @@ export function Nav() {
             {auth ? "Log in with Privy" : "Set VITE_PRIVY_APP_ID"}
           </button>
         )}
-      </div>
+      </div> */}
     </nav>
   );
 }

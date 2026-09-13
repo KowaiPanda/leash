@@ -12,11 +12,13 @@ export type Mandate = {
   revoked: boolean;
   hcsIssuanceSeq: number | null;
   createdAt: string;
+  pendingCeilingRaise?: { intentId: string; newCeiling: number } | null;
 };
 
 export type MandateEvent = {
   id: string;
   mandateId: string;
+  agentId?: string;
   type: string;
   amount?: number;
   reason?: string;
@@ -62,6 +64,11 @@ export const api = {
       body: JSON.stringify({ newCeiling }),
     }).then((r) => json<Mandate>(r)),
 
+  checkCeilingRaise: (id: string) =>
+    fetch(`${API_BASE}/api/mandates/${id}/check-ceiling-raise`, { method: "POST" }).then((r) =>
+      json<{ intentStatus: string; mandate: Mandate }>(r)
+    ),
+
   rails: () =>
     fetch(`${API_BASE}/api/pay/rails`).then((r) =>
       json<{ hedera: { live: boolean; network: string }; arc: { live: boolean; network: string } }>(r)
@@ -79,4 +86,6 @@ export const api = {
     }).then((r) => json<any>(r)),
 
   mirrorUrl: () => fetch(`${API_BASE}/api/audit/mirror-url`).then((r) => json<{ url: string }>(r)),
+
+  allEvents: () => fetch(`${API_BASE}/api/audit/events`).then((r) => json<MandateEvent[]>(r)),
 };
