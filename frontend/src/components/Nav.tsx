@@ -37,7 +37,7 @@ export function Nav() {
           </NavLink>
         ))}
       </div>
-      {/* <div>
+      <div className="hidden">
         {auth?.authenticated ? (
           <button onClick={auth.logout} className="text-sm text-slate-400 hover:text-slate-200">
             Log out
@@ -50,7 +50,7 @@ export function Nav() {
             {auth ? "Log in with Privy" : "Set VITE_PRIVY_APP_ID"}
           </button>
         )}
-      </div> */}
+      </div>
     </nav>
   );
 }
