@@ -25,9 +25,9 @@ export function Nav() {
     <nav className="mx-auto mt-4 flex w-[95%] max-w-6xl items-center justify-between rounded-3xl border border-gray-700 px-6 py-4 bg-slate-500/50 backdrop-blur-md">
       <div className="flex items-center gap-6">
         <img 
-          src="/logo.jpg" 
+          src="/logo.png" 
           alt="Leash Logo" 
-          className="h-8 w-auto object-contain" 
+          className="h-12 w-auto object-contain" 
         />
         {tabs.map((t) => (
           <NavLink
