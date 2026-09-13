@@ -89,8 +89,8 @@ Hedera.
 | | |
 |---|---|
 | Live app | `https://leash-kowaipanda.vercel.app/` |
-| Hedera HCS audit topic | `0.0.10473152` |
-| Hedera mirror node feed | `https://testnet.mirrornode.hedera.com/api/v1/topics/0.0.10473152/messages` |
+| Hedera HCS audit topic | `0.0.10473152` & `0.0.10523539`|
+| Hedera mirror node feed | `https://testnet.mirrornode.hedera.com/api/v1/topics/0.0.10473152/messages` <br> `https://testnet.mirrornode.hedera.com/api/v1/topics/0.0.10523539/messages` |
 | Example mandate (Hedera rail) | `d49752e0-dda4-41b2-abfa-a984377ff478` — issuance HCS seq `#29` |
 | Example settlement tx (Hedera / Blocky402) | `0.0.7162784@1789277457.419859171` |
 | Example settlement tx (Arc / Circle) | `0x7de3aa03d882b08a1620d49bd0d173c977a5476dc89f23d626ccf2452bc52056` |
