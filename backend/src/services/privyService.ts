@@ -1,35 +1,27 @@
+import { PrivyClient, generateAuthorizationSignature  } from "@privy-io/node";
 import { config } from "../config.js";
 
-// Server-side calls to Privy's REST API. Requests are authenticated with
-// HTTP Basic auth using your app id + app secret 
+// Server-side Privy integration. Two distinct pieces:
+//   1. Mandate issuance signing.
+//   2. The ceiling-raise quorum flow: a quorum-owned Ethereum POLICY stands
+//      in for "the mandate's ceiling." Privy policies gate real wallet
+//      transaction methods (eth_sendTransaction, transfer, etc.) scoped to
+//      a chain_type — there is no generic arbitrary-field policy type. We
+//      mirror the mandate's ceiling into a real, quorum-owned policy rule's
+//      numeric value purely so that CHANGING that number requires genuine
+//      N-of-M human approval through Privy's own intents/quorum system.
+//      Nothing here gates a real on-chain transfer.
 
-function authHeader(): string {
-  const token = Buffer.from(`${config.privy.appId}:${config.privy.appSecret}`).toString("base64");
-  return `Basic ${token}`;
-}
-
-async function privyFetch(path: string, init: RequestInit = {}) {
-  const res = await fetch(`https://api.privy.io${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: authHeader(),
-      "privy-app-id": config.privy.appId,
-      ...(init.headers ?? {}),
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`Privy API ${path} failed: ${res.status} ${await res.text()}`);
+let client: PrivyClient | null = null;
+function getClient(): PrivyClient {
+  if (client) return client;
+  if (!config.privy.appId || !config.privy.appSecret) {
+    throw new Error("PRIVY_APP_ID / PRIVY_APP_SECRET missing — see backend/.env");
   }
-  return res.json();
+  client = new PrivyClient({ appId: config.privy.appId, appSecret: config.privy.appSecret });
+  return client;
 }
 
-/**
- * Canonical, deterministic string for a mandate's terms. This is what the
- * issuer's Privy wallet signs at issuance time, and what gets hashed into
- * the HCS ISSUED event, so the mandate's terms can't be altered after the
- * fact without the signature failing to verify.
- */
 export function canonicalMandatePayload(input: {
   agentId: string;
   scope: string[];
@@ -46,31 +38,101 @@ export function canonicalMandatePayload(input: {
   });
 }
 
-
-// Signs the mandate payload using a Privy server wallet 
-export async function signMandate(walletId: string, payload: string) {
-  return privyFetch(`/v1/wallets/${walletId}/raw_sign`, {
-    method: "POST",
-    body: JSON.stringify({
-      params: { hash: `0x${Buffer.from(payload).toString("hex")}` },
-    }),
-  });
+function ceilingToRuleValue(usdc: number): string {
+  return Math.round(usdc * 1_000_000).toString();
 }
 
-/**
- * Creates an intent to update a policy/wallet that is owned by the app's
- * key quorum. Because the resource is quorum-owned, this call does not
- * execute immediately — it sits pending until enough quorum members approve
- * it from the Privy Dashboard.
- */
-export async function proposeCeilingRaiseIntent(policyId: string, newRule: unknown) {
-  return privyFetch(`/v1/policies/${policyId}`, {
-    method: "PATCH",
-    body: JSON.stringify({ rules: [newRule] }),
-    headers: { "privy-authorization-signature": "" }, // omitted -> becomes an async intent, not a synchronous call
+function ceilingRule(usdc: number) {
+  return {
+    name: "Current mandate ceiling",
+    method: "eth_sendTransaction",
+    action: "ALLOW",
+    conditions: [
+      {
+        field_source: "ethereum_transaction",
+        field: "value",
+        operator: "lte",
+        value: ceilingToRuleValue(usdc),
+      },
+    ],
+  };
+}
+
+export async function createCeilingPolicy(quorumId: string, initialCeilingUsdc: number) {
+  const c = getClient();
+  const policy = await c.policies().create({
+    version: "1.0",
+    name: "Leash mandate ceiling",
+    chain_type: "ethereum",
+    rules: [ceilingRule(initialCeilingUsdc)],
+    owner_id: quorumId,
   });
+  return policy.id;
+}
+
+function authHeaders() {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Basic ${Buffer.from(`${config.privy.appId}:${config.privy.appSecret}`).toString("base64")}`,
+    "privy-app-id": config.privy.appId,
+  };
+}
+
+export async function raiseCeilingWithSignatures(
+  policyId: string,
+  newCeilingUsdc: number,
+  authorizationPrivateKeys: string[]
+) {
+  const rawBody = { rules: [ceilingRule(newCeilingUsdc)] };
+  const body = JSON.parse(JSON.stringify(rawBody));
+  
+  const url = `https://api.privy.io/v1/policies/${policyId}`;
+  const method = "PATCH";
+  const privyHeaders = { "privy-app-id": config.privy.appId };
+  const input = { version: 1 as const, url, method: "PATCH" as const, headers: privyHeaders, body };
+ 
+  const rawSignatures = await Promise.all(
+    authorizationPrivateKeys.map((authorizationPrivateKey) =>
+      generateAuthorizationSignature({ authorizationPrivateKey, input })
+    )
+  );
+  
+  const signatures = rawSignatures.map((s: any) => {
+    if (typeof s === "string") return s;
+    if (s && typeof s === "object" && "signature" in s) return s.signature;
+    if (Array.isArray(s)) return s[0];
+    return String(s);
+  });
+ 
+  const res = await fetch(url, {
+    method,
+    headers: {
+      ...authHeaders(),
+      "privy-authorization-signature": signatures.join(","),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Privy policy update failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+// --- Legacy: async intents endpoint, kept for reference only. Requires
+// Dashboard Approvals enabled (Privy support gate) — use raiseCeilingWithSignatures() 
+// above instead, which does not need it. ---
+export async function proposeCeilingRaiseIntent(policyId: string, newCeilingUsdc: number) {
+  const res = await fetch(`https://api.privy.io/v1/apps/${config.privy.appId}/intents/policies/${policyId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ rules: [ceilingRule(newCeilingUsdc)] }),
+  });
+  if (!res.ok) throw new Error(`Privy intent creation failed: ${res.status} ${await res.text()}`);
+  return res.json() as Promise<{ id: string; status: string }>;
 }
 
 export async function getIntentStatus(intentId: string) {
-  return privyFetch(`/v1/intents/${intentId}`);
+  const res = await fetch(`https://api.privy.io/v1/apps/${config.privy.appId}/intents/${intentId}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Privy get intent failed: ${res.status} ${await res.text()}`);
+  return res.json() as Promise<{ id: string; status: "pending" | "authorized" | "executed" | "rejected" }>;
 }

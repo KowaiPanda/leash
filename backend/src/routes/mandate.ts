@@ -7,10 +7,12 @@ import {
   appendEvent,
   setIssuanceSeq,
   revokeMandate,
-  raiseCeiling,
+  raiseCeiling,  
+  setPendingCeilingRaise,
+  clearPendingCeilingRaise,
 } from "../services/mandateService.js";
 import { submitMandateEvent } from "../services/hcsService.js";
-import { canonicalMandatePayload } from "../services/privyService.js";
+import { canonicalMandatePayload, raiseCeilingWithSignatures } from "../services/privyService.js";
 
 export const mandatesRouter = Router();
 
@@ -91,6 +93,10 @@ mandatesRouter.post("/:id/revoke", async (req, res) => {
   res.json(getMandate(mandate.id));
 });
 
+// Raise the ceiling. If PRIVY_CEILING_POLICY_ID + two authorization private
+// keys are configured, this is signed by both keys and submitted to Privy
+// synchronously (see raiseCeilingWithSignatures) — it either succeeds or
+// throws in one round trip, no pending/polling state.
 mandatesRouter.post("/:id/raise-ceiling", async (req, res) => {
   const mandate = getMandate(req.params.id);
   if (!mandate) return res.status(404).json({ error: "not found" });
@@ -98,7 +104,7 @@ mandatesRouter.post("/:id/raise-ceiling", async (req, res) => {
   if (typeof newCeiling !== "number" || newCeiling <= mandate.ceiling) {
     return res.status(400).json({ error: "newCeiling must be a number greater than the current ceiling" });
   }
-
+ 
   const { seq, consensusTimestamp } = await submitMandateEvent({
     type: "CEILING_RAISE_PROPOSED",
     mandateId: mandate.id,
@@ -111,7 +117,18 @@ mandatesRouter.post("/:id/raise-ceiling", async (req, res) => {
     hcsSeq: seq,
     hcsConsensusTimestamp: consensusTimestamp,
   });
-
+ 
+  if (process.env.PRIVY_CEILING_POLICY_ID && process.env.PRIVY_AUTH_KEY_1 && process.env.PRIVY_AUTH_KEY_2) {
+    try {
+      await raiseCeilingWithSignatures(process.env.PRIVY_CEILING_POLICY_ID, newCeiling, [
+        process.env.PRIVY_AUTH_KEY_1,
+        process.env.PRIVY_AUTH_KEY_2,
+      ]);
+    } catch (e: any) {
+      return res.status(502).json({ error: "Privy quorum-signed ceiling raise failed", detail: e.message });
+    }
+  }
+ 
   raiseCeiling(mandate.id, newCeiling);
   const { seq: seq2, consensusTimestamp: ts2 } = await submitMandateEvent({
     type: "CEILING_RAISE_EXECUTED",
@@ -125,6 +142,6 @@ mandatesRouter.post("/:id/raise-ceiling", async (req, res) => {
     hcsSeq: seq2,
     hcsConsensusTimestamp: ts2,
   });
-
+ 
   res.json(getMandate(mandate.id));
 });

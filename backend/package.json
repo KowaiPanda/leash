@@ -8,11 +8,14 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "setup:arc": "tsx scripts/setupArcWallets.ts"
+    "setup:arc": "tsx scripts/setupArcWallets.ts",
+    "setup:privy-policy": "tsx scripts/setupPrivyPolicy.ts",
+    "debug:privy-quorum": "tsx scripts/debugPrivyQuorum.ts"
   },
   "dependencies": {
     "@circle-fin/developer-controlled-wallets": "^10.8.0",
     "@hashgraph/sdk": "^2.81.0",
+    "@privy-io/node": "^0.34.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",

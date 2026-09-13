@@ -94,6 +94,20 @@ export function raiseCeiling(mandateId: string, newCeiling: number) {
   saveSnapshot();
 }
 
+export function setPendingCeilingRaise(mandateId: string, intentId: string, newCeiling: number) {
+  const m = mandates.get(mandateId);
+  if (!m) return;
+  m.pendingCeilingRaise = { intentId, newCeiling };
+  saveSnapshot();
+}
+
+export function clearPendingCeilingRaise(mandateId: string) {
+  const m = mandates.get(mandateId);
+  if (!m) return;
+  m.pendingCeilingRaise = null;
+  saveSnapshot();
+}
+
 /**
  * The whole point of Leash. Given a mandate id, the resource being paid for,
  * and the amount, decide whether this payment may proceed *before* it is

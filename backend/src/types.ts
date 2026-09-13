@@ -3,7 +3,7 @@ export type Mandate = {
   agentId: string;
   issuerUserId: string;
   scope: string[];
-  ceiling: number;
+  ceiling: number; // USDC, decimal (e.g. 2.00)
   spent: number;
   rateLimit: {
     maxAmount: number;
@@ -15,6 +15,7 @@ export type Mandate = {
   issuerSignature: string;
   hcsIssuanceSeq: number | null;
   createdAt: string;
+  pendingCeilingRaise?: { intentId: string; newCeiling: number } | null;
 };
 
 export type MandateEventType =
